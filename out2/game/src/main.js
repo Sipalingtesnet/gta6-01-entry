@@ -21,16 +21,16 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0xfdba74);
-scene.fog = new THREE.FogExp2(0xfdba74, 0.008);
+scene.background = new THREE.Color(0xfcbd88);
+scene.fog = new THREE.FogExp2(0xfcbd88, 0.005);
 
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.5, 1000);
 
-const hemiLight = new THREE.HemisphereLight(0xfff7ed, 0x0c4a6e, 0.6);
+const hemiLight = new THREE.HemisphereLight(0xfffbeb, 0x0284c7, 0.9);
 scene.add(hemiLight);
 
-const dirLight = new THREE.DirectionalLight(0xffedd5, 1.2);
-dirLight.position.set(100, 150, 50);
+const dirLight = new THREE.DirectionalLight(0xffedd5, 1.8);
+dirLight.position.set(150, 200, 100);
 dirLight.castShadow = true;
 dirLight.shadow.mapSize.width = 1024;
 dirLight.shadow.mapSize.height = 1024;
@@ -53,6 +53,12 @@ const effectMgr = new EffectManager(scene);
 const input = new Input();
 
 const playerCar = vehicleMgr.spawnCar(10, 10, 0xef4444, true);
+
+const markerGeo = new THREE.ConeGeometry(2, 5, 8);
+const markerMat = new THREE.MeshBasicMaterial({ color: 0xeab308 });
+const objectiveMarker = new THREE.Mesh(markerGeo, markerMat);
+objectiveMarker.rotation.x = Math.PI;
+scene.add(objectiveMarker);
 
 let cash = savedState.cash;
 let gameState = 'title';
@@ -92,15 +98,24 @@ if (shotMode) {
   gameState = 'playing';
   if (shotMode === 'chase') {
     player.enterVehicle(playerCar);
-    policeMgr.setWanted(3);
     playerCar.mesh.position.set(0, 0, 0);
+    policeMgr.setWanted(3);
+    policeMgr.policeCars.push(vehicleMgr.spawnCar(0, 15, 0x1e3a8a, false));
+    policeMgr.policeCars.push(vehicleMgr.spawnCar(-4, 20, 0x1e3a8a, false));
+    policeMgr.policeCars.push(vehicleMgr.spawnCar(4, 20, 0x1e3a8a, false));
   } else if (shotMode === 'drive') {
     player.enterVehicle(playerCar);
-    playerCar.mesh.position.set(20, 0, 40);
+    playerCar.mesh.position.set(0, 0, 10);
   } else if (shotMode === 'foot') {
     player.position.set(5, 0, 5);
+    player.inCar = false;
+    player.mesh.visible = true;
+    playerCar.mesh.position.set(8, 0, 5);
   } else if (shotMode === 'mission') {
     player.position.set(10, 0, 10);
+    player.inCar = false;
+    player.mesh.visible = true;
+    playerCar.mesh.position.set(14, 0, 10);
   }
 }
 
@@ -118,10 +133,18 @@ function animate(now) {
         audioMgr.playBeep(300, 0.1);
       } else {
         const dist = player.position.distanceTo(playerCar.mesh.position);
-        if (dist < 4.5) {
+        if (dist < 5.0) {
           player.enterVehicle(playerCar);
           audioMgr.playBeep(500, 0.1);
         }
+      }
+    }
+
+    if (input.isDown('KeyF')) {
+      if (player.inCar) {
+        combatMgr.shoot(playerCar.mesh.position, new THREE.Vector3(0, 0, -1));
+      } else {
+        combatMgr.shoot(player.position, new THREE.Vector3(Math.sin(player.rotation), 0, Math.cos(player.rotation)));
       }
     }
 
@@ -133,23 +156,33 @@ function animate(now) {
     combatMgr.update(dt);
     effectMgr.update(dt);
 
+    const curMission = missionMgr.getCurrent();
+    if (curMission && curMission.pos) {
+      objectiveMarker.position.copy(curMission.pos);
+      objectiveMarker.position.y = 3 + Math.sin(now * 0.005) * 1.5;
+      objectiveMarker.rotation.y += dt * 2;
+    }
+
     const targetPos = player.inCar ? playerCar.mesh.position : player.position;
     const targetRot = player.inCar ? playerCar.mesh.rotation.y : player.rotation;
 
     const camOffset = new THREE.Vector3(
-      Math.sin(targetRot + Math.PI) * 8,
-      4.5,
-      Math.cos(targetRot + Math.PI) * 8
+      Math.sin(targetRot + Math.PI) * 9,
+      4.8,
+      Math.cos(targetRot + Math.PI) * 9
     );
-    camera.position.lerp(targetPos.clone().add(camOffset), 0.1);
-    camera.lookAt(targetPos.clone().add(new THREE.Vector3(0, 1.2, 0)));
+    camera.position.lerp(targetPos.clone().add(camOffset), 0.15);
+    camera.lookAt(targetPos.clone().add(new THREE.Vector3(0, 1.4, 0)));
 
-    const currentMission = missionMgr.getCurrent();
     hud.update({
       cash,
       wanted: policeMgr.wantedLevel,
-      mission: currentMission,
-      speed: Math.round(Math.abs(playerCar.speed) * 3.6)
+      mission: curMission,
+      speed: Math.round(Math.abs(playerCar.speed) * 3.6),
+      playerPos: targetPos,
+      trafficCars: trafficMgr.trafficCars,
+      policeCars: policeMgr.policeCars,
+      missionPos: curMission ? curMission.pos : null
     });
   }
 

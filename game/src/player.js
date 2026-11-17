@@ -4,7 +4,6 @@ export class Player {
   constructor(scene) {
     this.mesh = new THREE.Group();
     
-    // Body / Torso
     const bodyGeo = new THREE.CapsuleGeometry(0.4, 1.2, 4, 8);
     const bodyMat = new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.7 });
     this.bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
@@ -12,7 +11,6 @@ export class Player {
     this.bodyMesh.castShadow = true;
     this.mesh.add(this.bodyMesh);
 
-    // Head
     const headGeo = new THREE.SphereGeometry(0.25, 8, 8);
     const headMat = new THREE.MeshStandardMaterial({ color: 0xfde047, roughness: 0.5 });
     const head = new THREE.Mesh(headGeo, headMat);
@@ -49,7 +47,6 @@ export class Player {
       const vx = Math.sin(angle) * this.speed;
       const vz = Math.cos(angle) * this.speed;
 
-      // Simple collision against buildings
       const nextX = this.position.x + vx * dt;
       const nextZ = this.position.z + vz * dt;
 
@@ -82,7 +79,11 @@ export class Player {
   exitVehicle() {
     this.inCar = false;
     if (this.currentCar) {
-      this.position.copy(this.currentCar.mesh.position).add(new THREE.Vector3(2.5, 0, 0));
+      this.position.set(
+        this.currentCar.mesh.position.x + 2.5,
+        0,
+        this.currentCar.mesh.position.z
+      );
       this.currentCar = null;
     }
     this.mesh.visible = true;
